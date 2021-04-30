@@ -17,7 +17,6 @@ class Tree:
         #print()
         #print('here',F(self.State))
         self.p,self.v=F(self.State) #This function will load P from Network
-        
         self.child=np.array([None for i in range(size**2)])
         self.parent=None
         self.W=np.array([0 for i in range(size**2)])
@@ -32,7 +31,7 @@ class Tree:
         self.invalid=self.State[3].reshape(-1)
         
     def back_up(self):
-        print('in back_up')
+        #print('in back_up')
         #現在back up 因為變成action value，action value 會attach 在parent身上。所以往回
         #送的時候，可能還要給出 node number之類的
 
@@ -41,7 +40,7 @@ class Tree:
         position=self.add
         value=self.v
         while cur!=None:
-            print('in back_up loop')
+            #print('in back_up loop')
             #print()
             cur.W[position]=cur.W[position]+value
             cur.N[position]+=1
@@ -57,8 +56,6 @@ class Tree:
         
         #1. 如果自己已經有找到空的node 直接expand
         #2. 如果自己是找到下一個node recursive 到下一個node
-        #3. 如果都找不到空的node 下一個也都回傳Done=False 回傳False
-        #但其實還要考慮到 不能走的step要怎麼表示的問題。
         if self.Done==False:
         
             self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
@@ -67,12 +64,13 @@ class Tree:
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
             for i in range(self.size**2):
-                if self.invalid[i]==True:
+                if self.invalid[soted_index[i]]==True:
                     #Then jump to next i
                     pass
                 elif self.child[soted_index[i]]==None:
                     #Then Do expand
                     self.expand(soted_index[i])
+               
                     return True
                 elif self.child[soted_index[i]]!=None:
                     Done=self.child[soted_index[i]].selection()
@@ -106,7 +104,7 @@ class MCTS():
     def __init__(self):
         go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
         root=Tree(parent=None ,added_position=None ,env=go_env , size=7 , F=f)
-        for i in range(15):
+        for i in range(200):
             root.selection()
         root.clear_None()
         print_tree(root, childattr='child_none_out', nameattr='name', horizontal=False)
