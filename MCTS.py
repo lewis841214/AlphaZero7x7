@@ -4,8 +4,9 @@ from pptree import *
 
 size=7
 class Tree:
-    def __init__(self,parent ,added_position ,env , size , F, Done=False, lambda_=0.5, gamma=1):
+    def __init__(self,parent ,added_position ,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.size=size
+        self.layer=layer
         self.gamma=gamma
         self.lambda_=lambda_
         self.env=env
@@ -19,7 +20,7 @@ class Tree:
         
         self.child=np.array([None for i in range(size**2)])
         self.parent=None
-        self.W=0
+        self.W=np.array([0 for i in range(size**2)])
         #Q is a action value function
         self.act_Q=np.array([0 for i in range(size**2)])
         self.N=np.array([0 for i in range(size**2)])
@@ -31,18 +32,24 @@ class Tree:
         self.invalid=self.State[3].reshape(-1)
         
     def back_up(self):
+        print('in back_up')
         #現在back up 因為變成action value，action value 會attach 在parent身上。所以往回
         #送的時候，可能還要給出 node number之類的
 
         
         cur=self.parent
         position=self.add
+        value=self.v
         while cur!=None:
-            cur.W[position]+=self.v
+            print('in back_up loop')
+            #print()
+            cur.W[position]=cur.W[position]+value
             cur.N[position]+=1
-            cur.Q[position]=cur.W[position]/cur.N[position]
+            cur.act_Q[position]=cur.W[position]/cur.N[position]
             position=cur.add
+            cur=cur.parent
     def selection(self):
+        #print(self.parent)
         #This function goes to some node and select a edge with no attached node.
         #But we should consider the stopping criteria
         #We should write a recurssive function to deal with this
@@ -53,7 +60,10 @@ class Tree:
         #3. 如果都找不到空的node 下一個也都回傳Done=False 回傳False
         #但其實還要考慮到 不能走的step要怎麼表示的問題。
         if self.Done==False:
+        
             self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
+            #print(self.S_select)
+            #print(np.argmax(self.S_select))
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
             for i in range(self.size**2):
@@ -73,8 +83,9 @@ class Tree:
         #first put 
         self.env.state_=self.State
         self.env.step(added_position)
-        self.child[added_position]=Tree(self, added_position ,self.env , self.size, F=self.F)
-
+        self.child[added_position]=Tree(self, added_position ,self.env , self.size, F=self.F, layer=self.layer+1)
+        self.child[added_position].parent=self
+        self.child[added_position].back_up()
     def play(self):
         self.pi=self.N**self.gamma/np.sum(self.N**self.gamma)
         next_action=np.max(self.pi)
@@ -95,10 +106,15 @@ class MCTS():
     def __init__(self):
         go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
         root=Tree(parent=None ,added_position=None ,env=go_env , size=7 , F=f)
-        for i in range(4):
+        for i in range(15):
             root.selection()
         root.clear_None()
         print_tree(root, childattr='child_none_out', nameattr='name', horizontal=False)
+        """
+        print(root.child)
+        root=root.child_none_out[0]
+        print(root.child)
+        """
     
 
 if __name__ == '__main__':
