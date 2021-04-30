@@ -1,23 +1,34 @@
+import gym
 import numpy as np
+from pptree import *
+
+size=7
 class Tree:
-    def __init__(self,parent ,added_position ,board ,invalid, size , F, Done=False, lambda_=0.5, gamma=1):
+    def __init__(self,parent ,added_position ,env , size , F, Done=False, lambda_=0.5, gamma=1):
         self.size=size
         self.gamma=gamma
+        self.lambda_=lambda_
+        self.env=env
         self.data = None
-        self.p=np.array(F(board)[0]) #This function will load P from Network
-        self.v=F(board)[0]
+        self.State=env.state_
+        self.F=F
+        self.name=str(added_position)
+        #print()
+        #print('here',F(self.State))
+        self.p,self.v=F(self.State) #This function will load P from Network
+        
         self.child=np.array([None for i in range(size**2)])
         self.parent=None
         self.W=0
         #Q is a action value function
         self.act_Q=np.array([0 for i in range(size**2)])
         self.N=np.array([0 for i in range(size**2)])
-        self.State=board
+        
         self.add=added_position
         self.Done=Done
-        self.z
+        self.z=None
         # This show the invalid index, then when selection wants to go to here, it skip the invalid step
-        self.invalid=invalid
+        self.invalid=self.State[3].reshape(-1)
         
     def back_up(self):
         #現在back up 因為變成action value，action value 會attach 在parent身上。所以往回
@@ -41,8 +52,8 @@ class Tree:
         #2. 如果自己是找到下一個node recursive 到下一個node
         #3. 如果都找不到空的node 下一個也都回傳Done=False 回傳False
         #但其實還要考慮到 不能走的step要怎麼表示的問題。
-        if seld.Done==False:
-            self.S_select=self.Q+lambda_*(self.p/(1+self.N))
+        if self.Done==False:
+            self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
             for i in range(self.size**2):
@@ -52,30 +63,46 @@ class Tree:
                 elif self.child[soted_index[i]]==None:
                     #Then Do expand
                     self.expand(soted_index[i])
+                    return True
                 elif self.child[soted_index[i]]!=None:
-                    self.child[soted_index[i]].selection()
+                    Done=self.child[soted_index[i]].selection()
+                    if Done==True:
+                        return True
                 
     def expand(self, added_position):
         #first put 
-        self.child[added_position]=Tree(self, added_position ,board ,invalid, size)
+        self.env.state_=self.State
+        self.env.step(added_position)
+        self.child[added_position]=Tree(self, added_position ,self.env , self.size, F=self.F)
 
     def play(self):
         self.pi=self.N**self.gamma/np.sum(self.N**self.gamma)
         next_action=np.max(self.pi)
-class MCTS():
-    def __init__(self):
-        go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
-
-if __name__ == '__main__':
-    #First create a neural network which will output prabability distribution and action|state value
-    size=7
-    def f(State_):
+    def clear_None(self):
+        self.child_none_out=self.child[self.child != np.array(None)]
+        for i in range(self.child_none_out.shape[0]):
+            self.child_none_out[i].clear_None()
+            
+#Here create a function output just like Neural network
+def f(State_):
         p=np.random.multinomial(107, [1/size**2]*size**2)
         #print(p)
         p=p/np.sum(p)
         v=(np.random.rand()-0.5)*2
         return p,v
-    s=2
-    print(f(2))
+
+class MCTS():
+    def __init__(self):
+        go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
+        root=Tree(parent=None ,added_position=None ,env=go_env , size=7 , F=f)
+        for i in range(4):
+            root.selection()
+        root.clear_None()
+        print_tree(root, childattr='child_none_out', nameattr='name', horizontal=False)
+    
+
+if __name__ == '__main__':
+    #First create a neural network which will output prabability distribution and action|state value
+    mcts=MCTS()
     
 
