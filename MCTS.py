@@ -2,9 +2,9 @@ import gym
 import numpy as np
 from pptree import *
 
-size=1
+size=2
 class Tree:
-    def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=0, gamma=1):
+    def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
         self.size=size
         self.layer=layer
@@ -43,7 +43,7 @@ class Tree:
         cur=self.parent
         position=self.add
         value=self.v
-        print('position',position,'value',value,'\n')
+        print('position',position,'value',value)
         value=-value
         while cur!=None:
             #print('in back_up loop')
@@ -54,6 +54,7 @@ class Tree:
             cur.N[position]+=1
             cur.act_Q[position]=cur.W[position]/cur.N[position]
             position=cur.add
+            print('position',position,)
             #print('\n hi',cur.act_Q[position],cur.W[position],cur.N[position],'\n')
             """
             Here add some recorded
@@ -78,6 +79,9 @@ class Tree:
             #print(np.argmax(self.S_select))
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
+
+            #print('S_select',self.S_select)
+            #print('sorted index',soted_index)
             for i in range(self.action_num):
                 if soted_index[i]==self.size**2:
                     self.expand(soted_index[i])
@@ -99,6 +103,7 @@ class Tree:
         #first put 
         self.env.state_=self.State
         self.env.step(added_position)
+        self.env.render('terminal')
         self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
         self.child[added_position].back_up()
@@ -139,26 +144,27 @@ class Tree:
             
 #Here create a function output just like Neural network
 def f(State_):
-        p=np.random.multinomial(107, [1/(size**2+1)]*(size**2+1))
-        #print(p)
+        p=np.random.multinomial(109, [1/(size**2+1)]*(size**2+1))
+        
         p=p/np.sum(p)
+        #print('p',p)
         v=(np.random.rand()-0.5)*2
         return p,v
 
 class MCTS():
     def __init__(self):
-        go_env = gym.make('gym_go:go-v0', size=1, komi=0, reward_method='real')
-        playing_env = gym.make('gym_go:go-v0', size=1, komi=0, reward_method='real')
-        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=1 , F=f)
-        root.clear_None()
-        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
-        for i in range(3):
+        go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='real')
+        playing_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='real')
+        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=2 , F=f)
+        #root.clear_None()
+        #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+        for i in range(50):
             root.selection()
-            root.clear_None()
-            print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+            #root.clear_None()
+            #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
         root.play()
-        root.clear_None()
-        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+        #root.clear_None()
+        #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
         """
         print(root.child)
         root=root.child_none_out[0]
