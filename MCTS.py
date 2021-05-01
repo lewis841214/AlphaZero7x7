@@ -2,9 +2,9 @@ import gym
 import numpy as np
 from pptree import *
 
-size=7
+size=1
 class Tree:
-    def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
+    def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=0, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
         self.size=size
         self.layer=layer
@@ -12,7 +12,6 @@ class Tree:
         self.lambda_=lambda_
         self.playing_env=playing_env
         self.env=env
-        self.data = None
         self.State=env.state_
         self.F=F
         self.name=str(added_position)
@@ -21,9 +20,9 @@ class Tree:
         self.p,self.v=F(self.State) #This function will load P from Network
         self.child=np.array([None for i in range(self.action_num)])
         self.parent=None
-        self.W=np.array([0 for i in range(self.action_num)])
+        self.W=np.array([0 for i in range(self.action_num)], dtype=np.float32)
         #Q is a action value function
-        self.act_Q=np.array([0 for i in range(self.action_num)])
+        self.act_Q=np.array([0 for i in range(self.action_num)], dtype=np.float32)
         self.N=np.array([0 for i in range(self.action_num)])
         
         self.add=added_position
@@ -32,6 +31,8 @@ class Tree:
         # This show the invalid index, then when selection wants to go to here, it skip the invalid step
         self.invalid=self.State[3].reshape(-1)
         self.Seq_recorder=[]
+        #self.visual=[self.v,self.W, self.N]
+        self.visual=" ".join(str(x) for x in self.W)
         
     def back_up(self):
         #print('in back_up')
@@ -42,14 +43,25 @@ class Tree:
         cur=self.parent
         position=self.add
         value=self.v
+        print('position',position,'value',value,'\n')
+        value=-value
         while cur!=None:
             #print('in back_up loop')
-            #print()
+            
+            #print('cur.W[position]',cur.W[position])
             cur.W[position]=cur.W[position]+value
+            #print('cur.W[position]',cur.W[position])
             cur.N[position]+=1
             cur.act_Q[position]=cur.W[position]/cur.N[position]
             position=cur.add
+            #print('\n hi',cur.act_Q[position],cur.W[position],cur.N[position],'\n')
+            """
+            Here add some recorded
+            """
+            cur.visual=" ".join(str(x) for x in cur.W)
             cur=cur.parent
+            value=-value
+
     def selection(self):
         #print(self.parent)
         #This function goes to some node and select a edge with no attached node.
@@ -67,7 +79,7 @@ class Tree:
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
             for i in range(self.action_num):
-                if soted_index[i]==49:
+                if soted_index[i]==self.size**2:
                     self.expand(soted_index[i])
                     return True
                 elif self.invalid[soted_index[i]]==True:
@@ -135,14 +147,18 @@ def f(State_):
 
 class MCTS():
     def __init__(self):
-        go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
-        playing_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
-        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=7 , F=f)
-        for i in range(50):
+        go_env = gym.make('gym_go:go-v0', size=1, komi=0, reward_method='real')
+        playing_env = gym.make('gym_go:go-v0', size=1, komi=0, reward_method='real')
+        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=1 , F=f)
+        root.clear_None()
+        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+        for i in range(3):
             root.selection()
+            root.clear_None()
+            print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
         root.play()
         root.clear_None()
-        print_tree(root, childattr='child_none_out', nameattr='name', horizontal=False)
+        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
         """
         print(root.child)
         root=root.child_none_out[0]
