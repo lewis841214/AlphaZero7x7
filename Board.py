@@ -4,15 +4,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='real')
-go_env.step(0)
+go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='heuristic')
+state,reward,_,_=go_env.step(0)
+go_env.render('terminal')
+print(state[2],reward)
 go_env.step(4)
 state,_,_,_=go_env.step(3)
+
+print(state[2])
 go_env.render('terminal')
-print(state[3])
+
 state, reward, done, info=go_env.step(4)
+print(state[2])
 go_env.render('terminal')
-print(state[3])
+
 """
 for i in range(45):
     state, reward, done, info = go_env.step(i)

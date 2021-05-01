@@ -43,7 +43,7 @@ class Tree:
         cur=self.parent
         position=self.add
         value=self.v
-        print('\nposition',position,'value',value)
+        #print('\nposition',position,'value',value)
         value=-value
         while cur!=None:
             #print('in back_up loop')
@@ -54,7 +54,7 @@ class Tree:
             cur.N[position]+=1
             cur.act_Q[position]=cur.W[position]/cur.N[position]
             position=cur.add
-            print('position',position,)
+            #print('position',position,)
             #print('\n hi',cur.act_Q[position],cur.W[position],cur.N[position],'\n')
             """
             Here add some recorded
@@ -62,7 +62,7 @@ class Tree:
             cur.visual=" ".join(str(x) for x in cur.W)
             cur=cur.parent
             value=-value
-        print('end back up')
+        #print('end back up')
 
     def selection(self):
         #print(self.parent)
@@ -73,13 +73,17 @@ class Tree:
         
         #1. 如果自己已經有找到空的node 直接expand
         #2. 如果自己是找到下一個node recursive 到下一個node
-        if self.add==self.size**2:
-            print('ggg')
-            print('done',self.Done)
-        if self.Done!=False:
-            print('HHHHHHHHHHHHHHHHHHH')
+        
     
         if self.Done!=1:
+            #如果說 上一步來的是pass且我們這邊的局勢比較好，則我們也pass
+            if self.add==self.size**2:
+                #接下來偵測換黑或是白子
+                #np.sum(self.state[2])>0換白子 np.sum(self.state[2])==0 換黑子=>np.sum(self.state[2])-1<0
+                #reward>0 代表黑子贏 <0代表白子贏
+                #所以說(np.sum(self.state[2])-1)*reward<0 => 換黑子(-) 黑贏(+) or 換白子 (+) 白贏 (-) 
+                if (np.sum(self.State[2])-1)*self.reward<0:
+                    self.expand(self.size**2)
             #self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
             self.S_select=self.lambda_*(self.p/(1+self.N))
             #print(self.S_select)
@@ -124,17 +128,18 @@ class Tree:
         self.env.state_=self.State
         state, reward, done, info = self.env.step(added_position)
         #print('done expand',done)
-        print(added_position)
+        #print(added_position)
         #self.env.render('terminal')
         self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size,Done=done, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
         self.child[added_position].back_up()
+        self.child[added_position].reward=reward
         # 如果done=1的時候，env就會掛掉 就不能再重新帶入state_了。所以我們要把env.done改成0
         if done==1:
             self.env.done=0
     def play(self):
         if np.sum(self.invalid)==self.size**2:
-            next_action=self.action_num
+            next_action=self.action_num-1
             self.pi=np.array([0 for i in range(self.size**2+1)])
             self.pi[-1]=1
         else:
@@ -143,12 +148,10 @@ class Tree:
         #有了pi之後 我們就可以把pi record下來。每個state 會有一個對應到的pi 跟z 
         self.Seq_recorder.append([self.State, self.pi])
 
-
-
         #接下來 就是用把self.playing_env.step(next_action)
         #並偵測是否已經結束。 已經結束的話 就可以開始製作sequence
         #若還沒結束的話，將now_root移到選擇的那個action
-        print(next_action)
+        print('play',next_action)
         state, reward, done, info=self.playing_env.step(next_action)
     
         if done==1:
@@ -178,16 +181,19 @@ def f(State_):
 
 class MCTS():
     def __init__(self):
-        go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='real')
+        #為了在過程中 偵測誰的地盤比較大，所以在go_env(衡量每個node的狀態) 我們把reward設成Heuristic，以便偵測當一個人pass的時候，另一個人如果已經贏了(地盤比較大)那就要pass
+        go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='heuristic')
         playing_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='real')
         root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=2 , F=f)
+        now_node=root
         #root.clear_None()
         #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
-        for i in range(500):
-            root.selection()
-            #root.clear_None()
-            #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
-        root.play()
+        while now_node!=None:
+            for i in range(10):
+                now_node.selection()
+                #root.clear_None()
+                #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+            now_node=now_node.play()
         #root.clear_None()
         #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
         """
