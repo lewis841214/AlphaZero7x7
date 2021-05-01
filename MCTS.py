@@ -4,12 +4,13 @@ from pptree import *
 
 size=7
 class Tree:
-    def __init__(self,parent ,added_position ,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
+    def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
         self.size=size
         self.layer=layer
         self.gamma=gamma
         self.lambda_=lambda_
+        self.playing_env=playing_env
         self.env=env
         self.data = None
         self.State=env.state_
@@ -18,18 +19,19 @@ class Tree:
         #print()
         #print('here',F(self.State))
         self.p,self.v=F(self.State) #This function will load P from Network
-        self.child=np.array([None for i in range(size**2)])
+        self.child=np.array([None for i in range(self.action_num)])
         self.parent=None
-        self.W=np.array([0 for i in range(size**2)])
+        self.W=np.array([0 for i in range(self.action_num)])
         #Q is a action value function
-        self.act_Q=np.array([0 for i in range(size**2)])
-        self.N=np.array([0 for i in range(size**2)])
+        self.act_Q=np.array([0 for i in range(self.action_num)])
+        self.N=np.array([0 for i in range(self.action_num)])
         
         self.add=added_position
         self.Done=Done
         self.z=None
         # This show the invalid index, then when selection wants to go to here, it skip the invalid step
         self.invalid=self.State[3].reshape(-1)
+        self.Seq_recorder=[]
         
     def back_up(self):
         #print('in back_up')
@@ -64,8 +66,11 @@ class Tree:
             #print(np.argmax(self.S_select))
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
-            for i in range(self.size**2):
-                if self.invalid[soted_index[i]]==True:
+            for i in range(self.action_num):
+                if soted_index[i]==49:
+                    self.expand(soted_index[i])
+                    return True
+                elif self.invalid[soted_index[i]]==True:
                     #Then jump to next i
                     pass
                 elif self.child[soted_index[i]]==None:
@@ -82,20 +87,47 @@ class Tree:
         #first put 
         self.env.state_=self.State
         self.env.step(added_position)
-        self.child[added_position]=Tree(self, added_position ,self.env , self.size, F=self.F, layer=self.layer+1)
+        self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
         self.child[added_position].back_up()
     def play(self):
-        self.pi=self.N**self.gamma/np.sum(self.N**self.gamma)
-        next_action=np.max(self.pi)
+        if np.sum(self.invalid)==self.size**2:
+            next_action=self.action_num
+            self.pi=np.array([0 for i in range(self.size**2+1)])
+            self.pi[-1]=1
+        else:
+            self.pi=self.N**self.gamma/np.sum(self.N**self.gamma)
+            next_action=np.argmax(self.pi)
+        #有了pi之後 我們就可以把pi record下來。每個state 會有一個對應到的pi 跟z 
+        self.Seq_recorder.append([self.State, self.pi])
+
+
+
+        #接下來 就是用把self.playing_env.step(next_action)
+        #並偵測是否已經結束。 已經結束的話 就可以開始製作sequence
+        #若還沒結束的話，將now_root移到選擇的那個action
+        print(next_action)
+        state, reward, done, info=self.playing_env.step(next_action)
+    
+        if done==1:
+            #這邊開始將結果"reward"=[-1 or 1] 1 是黑棋贏的時候塞回去sequence中。
+            #(S0, pi0) 為function第一個衡量的情況，也就是黑棋贏的機率
+            for i in range(len(self.Seq_recorder)):
+                self.Seq_recorder[i].append(reward)
+                reward=-reward
+            return None
+        else:
+            return self.child[next_action]
+        
     def clear_None(self):
+        
         self.child_none_out=self.child[self.child != np.array(None)]
         for i in range(self.child_none_out.shape[0]):
             self.child_none_out[i].clear_None()
             
 #Here create a function output just like Neural network
 def f(State_):
-        p=np.random.multinomial(107, [1/size**2]*size**2)
+        p=np.random.multinomial(107, [1/(size**2+1)]*(size**2+1))
         #print(p)
         p=p/np.sum(p)
         v=(np.random.rand()-0.5)*2
@@ -104,9 +136,11 @@ def f(State_):
 class MCTS():
     def __init__(self):
         go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
-        root=Tree(parent=None ,added_position=None ,env=go_env , size=7 , F=f)
+        playing_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='real')
+        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=7 , F=f)
         for i in range(50):
             root.selection()
+        root.play()
         root.clear_None()
         print_tree(root, childattr='child_none_out', nameattr='name', horizontal=False)
         """
