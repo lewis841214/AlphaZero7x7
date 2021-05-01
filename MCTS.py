@@ -43,7 +43,7 @@ class Tree:
         cur=self.parent
         position=self.add
         value=self.v
-        print('position',position,'value',value)
+        print('\nposition',position,'value',value)
         value=-value
         while cur!=None:
             #print('in back_up loop')
@@ -62,6 +62,7 @@ class Tree:
             cur.visual=" ".join(str(x) for x in cur.W)
             cur=cur.parent
             value=-value
+        print('end back up')
 
     def selection(self):
         #print(self.parent)
@@ -72,29 +73,48 @@ class Tree:
         
         #1. 如果自己已經有找到空的node 直接expand
         #2. 如果自己是找到下一個node recursive 到下一個node
-        if self.Done==False:
-        
-            self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
+        if self.add==self.size**2:
+            print('ggg')
+            print('done',self.Done)
+        if self.Done!=False:
+            print('HHHHHHHHHHHHHHHHHHH')
+    
+        if self.Done!=1:
+            #self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
+            self.S_select=self.lambda_*(self.p/(1+self.N))
             #print(self.S_select)
             #print(np.argmax(self.S_select))
             soted_index=np.argsort(self.S_select)
             soted_index=np.flip(soted_index)
-
+            #self.env.render('terminal')
+            #print('soted_index',soted_index)
+            #print('self.invalid',self.invalid)
             #print('S_select',self.S_select)
             #print('sorted index',soted_index)
             for i in range(self.action_num):
                 if soted_index[i]==self.size**2:
-                    self.expand(soted_index[i])
-                    return True
+                    if self.child[soted_index[i]]==None:
+                        self.expand(soted_index[i])
+                        return True
+                    elif self.child[soted_index[i]]!=None:
+                        Done=self.child[soted_index[i]].selection()
+                        if Done==True:
+                            return True
+
+                
                 elif self.invalid[soted_index[i]]==True:
                     #Then jump to next i
                     pass
                 elif self.child[soted_index[i]]==None:
                     #Then Do expand
+                    #print(self.invalid)
+                    #print('soted_index[i]',soted_index[i])
                     self.expand(soted_index[i])
                
                     return True
                 elif self.child[soted_index[i]]!=None:
+                    #print(self.invalid)
+                    #print('soted_index[i]',soted_index[i])
                     Done=self.child[soted_index[i]].selection()
                     if Done==True:
                         return True
@@ -102,11 +122,16 @@ class Tree:
     def expand(self, added_position):
         #first put 
         self.env.state_=self.State
-        self.env.step(added_position)
-        self.env.render('terminal')
-        self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size, F=self.F, layer=self.layer+1)
+        state, reward, done, info = self.env.step(added_position)
+        #print('done expand',done)
+        print(added_position)
+        #self.env.render('terminal')
+        self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size,Done=done, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
         self.child[added_position].back_up()
+        # 如果done=1的時候，env就會掛掉 就不能再重新帶入state_了。所以我們要把env.done改成0
+        if done==1:
+            self.env.done=0
     def play(self):
         if np.sum(self.invalid)==self.size**2:
             next_action=self.action_num
@@ -158,7 +183,7 @@ class MCTS():
         root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=2 , F=f)
         #root.clear_None()
         #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
-        for i in range(50):
+        for i in range(500):
             root.selection()
             #root.clear_None()
             #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
