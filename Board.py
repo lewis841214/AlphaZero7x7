@@ -8,10 +8,12 @@ go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='heuristic')
 state,reward,_,_=go_env.step(0)
 go_env.render('terminal')
 print(state[2],reward)
-go_env.step(4)
+state,_,_,_=go_env.step(4)
+print(state[2])
+print('pass',state[4])
 state,_,_,_=go_env.step(3)
 
-print(state[2])
+
 go_env.render('terminal')
 
 state, reward, done, info=go_env.step(4)

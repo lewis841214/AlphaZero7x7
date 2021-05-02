@@ -2,7 +2,7 @@ import gym
 import numpy as np
 from pptree import *
 
-size=2
+size=7
 class Tree:
     def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
@@ -78,14 +78,23 @@ class Tree:
         if self.Done!=1:
             #如果說 上一步來的是pass且我們這邊的局勢比較好，則我們也pass
             if self.add==self.size**2:
+                #print('進入領域')
+                #這邊有一點怪怪的  因為在接近尾聲的時候只要有invalid 步 就會導致
                 #接下來偵測換黑或是白子
                 #np.sum(self.state[2])>0換白子 np.sum(self.state[2])==0 換黑子=>np.sum(self.state[2])-1<0
                 #reward>0 代表黑子贏 <0代表白子贏
                 #所以說(np.sum(self.state[2])-1)*reward<0 => 換黑子(-) 黑贏(+) or 換白子 (+) 白贏 (-) 
                 if (np.sum(self.State[2])-1)*self.reward<0:
-                    self.expand(self.size**2)
-            #self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
-            self.S_select=self.lambda_*(self.p/(1+self.N))
+                    
+                    if self.child[self.size**2]==None:
+                        self.expand(self.size**2)
+                        return True
+                    #elif self.child[self.size**2]!=None:
+                        #這邊就不要再進去selection了，因為下面一個node不會有child。但是我們也要增加這種情況的計數，所以在這邊直接back up即可
+                    #    self.child[self.size**2].back_up()
+            self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
+            #print('self.act_Q',self.act_Q)
+            #self.S_select=self.lambda_*(self.p/(1+self.N))
             #print(self.S_select)
             #print(np.argmax(self.S_select))
             soted_index=np.argsort(self.S_select)
@@ -96,7 +105,9 @@ class Tree:
             #print('S_select',self.S_select)
             #print('sorted index',soted_index)
             for i in range(self.action_num):
+                #print(soted_index[i])
                 if soted_index[i]==self.size**2:
+                    #print('sel 進入 pass')
                     if self.child[soted_index[i]]==None:
                         self.expand(soted_index[i])
                         return True
@@ -127,9 +138,6 @@ class Tree:
         #first put 
         self.env.state_=self.State
         state, reward, done, info = self.env.step(added_position)
-        #print('done expand',done)
-        #print(added_position)
-        #self.env.render('terminal')
         self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size,Done=done, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
         self.child[added_position].back_up()
@@ -138,13 +146,27 @@ class Tree:
         if done==1:
             self.env.done=0
     def play(self):
+        try:
+            detect=(np.sum(self.State[2])-1)*self.reward<0
+        except:
+            detect=False
+
         if np.sum(self.invalid)==self.size**2:
+            print('因為前面')
             next_action=self.action_num-1
             self.pi=np.array([0 for i in range(self.size**2+1)])
             self.pi[-1]=1
+        elif detect and np.sum(self.State[4])>0: #代表 上一個人已經pass了
+            print('因為這邊')
+            
+            next_action=self.action_num-1
+            self.pi=np.array([0 for i in range(self.size**2+1)])
+            self.pi[-1]=1
+            
         else:
             self.pi=self.N**self.gamma/np.sum(self.N**self.gamma)
             next_action=np.argmax(self.pi)
+        #print(self.pi)
         #有了pi之後 我們就可以把pi record下來。每個state 會有一個對應到的pi 跟z 
         self.Seq_recorder.append([self.State, self.pi])
 
@@ -153,6 +175,7 @@ class Tree:
         #若還沒結束的話，將now_root移到選擇的那個action
         print('play',next_action)
         state, reward, done, info=self.playing_env.step(next_action)
+        self.playing_env.render('terminal')
     
         if done==1:
             #這邊開始將結果"reward"=[-1 or 1] 1 是黑棋贏的時候塞回去sequence中。
@@ -172,19 +195,21 @@ class Tree:
             
 #Here create a function output just like Neural network
 def f(State_):
-        p=np.random.multinomial(109, [1/(size**2+1)]*(size**2+1))
-        
-        p=p/np.sum(p)
-        #print('p',p)
-        v=(np.random.rand()-0.5)*2
-        return p,v
+    #pp=[1/(size**2+1)]*(size**2+1)
+    p=np.random.multinomial(1090, [1/(size**2+1)]*(size**2+1))
+    #rint('p=',p)
+    p[-1]=0
+    p=p/np.sum(p)
+    #print('p',p)
+    v=(np.random.rand()-0.5)*2
+    return p,v
 
 class MCTS():
     def __init__(self):
         #為了在過程中 偵測誰的地盤比較大，所以在go_env(衡量每個node的狀態) 我們把reward設成Heuristic，以便偵測當一個人pass的時候，另一個人如果已經贏了(地盤比較大)那就要pass
-        go_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='heuristic')
-        playing_env = gym.make('gym_go:go-v0', size=2, komi=0, reward_method='real')
-        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=2 , F=f)
+        go_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='heuristic')
+        playing_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='real')
+        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=size , F=f)
         now_node=root
         #root.clear_None()
         #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
