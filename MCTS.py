@@ -2,7 +2,7 @@ import gym
 import numpy as np
 from pptree import *
 
-size=7
+size=3
 class Tree:
     def __init__(self,parent ,added_position ,playing_env,env ,seq_reocord, size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
@@ -35,6 +35,7 @@ class Tree:
         self.visual=" ".join(str(x) for x in self.W)
         
     def back_up(self):
+        #print('進入back up')
         #print('in back_up')
         #現在back up 因為變成action value，action value 會attach 在parent身上。所以往回
         #送的時候，可能還要給出 node number之類的
@@ -43,7 +44,7 @@ class Tree:
         cur=self.parent
         position=self.add
         value=self.v
-        #print('\nposition',position,'value',value)
+        print('\nposition',position,'value',value)
         value=-value
         while cur!=None:
             #print('in back_up loop')
@@ -54,7 +55,7 @@ class Tree:
             cur.N[position]+=1
             cur.act_Q[position]=cur.W[position]/cur.N[position]
             position=cur.add
-            #print('position',position,)
+            print('position',position,)
             #print('\n hi',cur.act_Q[position],cur.W[position],cur.N[position],'\n')
             """
             Here add some recorded
@@ -73,8 +74,9 @@ class Tree:
         
         #1. 如果自己已經有找到空的node 直接expand
         #2. 如果自己是找到下一個node recursive 到下一個node
-        
-    
+        self.env.state_=self.State
+        #print('進入selection')
+        #self.env.render('terminal')
         if self.Done!=1:
             #如果說 上一步來的是pass且我們這邊的局勢比較好，則我們也pass
             if self.add==self.size**2:
@@ -89,9 +91,11 @@ class Tree:
                     if self.child[self.size**2]==None:
                         self.expand(self.size**2)
                         return True
-                    #elif self.child[self.size**2]!=None:
+                    elif self.child[self.size**2]!=None:
                         #這邊就不要再進去selection了，因為下面一個node不會有child。但是我們也要增加這種情況的計數，所以在這邊直接back up即可
-                    #    self.child[self.size**2].back_up()
+                        self.child[self.size**2].back_up()
+            #print('self.act_Q',self.act_Q)
+            #print('self.p',self.p)
             self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
             #print('self.act_Q',self.act_Q)
             #self.S_select=self.lambda_*(self.p/(1+self.N))
@@ -113,12 +117,12 @@ class Tree:
                         return True
                     elif self.child[soted_index[i]]!=None:
                         Done=self.child[soted_index[i]].selection()
-                        if Done==True:
-                            return True
+                        return True
 
                 
                 elif self.invalid[soted_index[i]]==True:
                     #Then jump to next i
+                    #print(soted_index[i],'inside invalid',self.invalid )
                     pass
                 elif self.child[soted_index[i]]==None:
                     #Then Do expand
@@ -130,11 +134,11 @@ class Tree:
                 elif self.child[soted_index[i]]!=None:
                     #print(self.invalid)
                     #print('soted_index[i]',soted_index[i])
-                    Done=self.child[soted_index[i]].selection()
-                    if Done==True:
-                        return True
+                    self.child[soted_index[i]].selection()
+                    return True
                 
     def expand(self, added_position):
+        #print('進入expand')
         #first put 
         self.env.state_=self.State
         state, reward, done, info = self.env.step(added_position)
@@ -152,12 +156,13 @@ class Tree:
             detect=False
 
         if np.sum(self.invalid)==self.size**2:
-            print('因為前面')
+            #print('換誰',self.State[2])
+            #print('因為前面')
             next_action=self.action_num-1
             self.pi=np.array([0 for i in range(self.size**2+1)])
             self.pi[-1]=1
         elif detect and np.sum(self.State[4])>0: #代表 上一個人已經pass了
-            print('因為這邊')
+            #print('因為這邊')
             
             next_action=self.action_num-1
             self.pi=np.array([0 for i in range(self.size**2+1)])
@@ -173,11 +178,13 @@ class Tree:
         #接下來 就是用把self.playing_env.step(next_action)
         #並偵測是否已經結束。 已經結束的話 就可以開始製作sequence
         #若還沒結束的話，將now_root移到選擇的那個action
-        print('play',next_action)
+        #print('play',next_action)
         state, reward, done, info=self.playing_env.step(next_action)
+        #print('pi',self.pi)
         self.playing_env.render('terminal')
-    
+        #print('經過這邊')
         if done==1:
+            #print('進來邊 前')
             #這邊開始將結果"reward"=[-1 or 1] 1 是黑棋贏的時候塞回去sequence中。
             #(S0, pi0) 為function第一個衡量的情況，也就是黑棋贏的機率
             for i in range(len(self.seq_reocord)):
@@ -185,6 +192,7 @@ class Tree:
                 reward=-reward
             return None
         else:
+            #print('進來這邊 換')
             return self.child[next_action]
         
     def clear_None(self):
@@ -198,7 +206,7 @@ def f(State_):
     #pp=[1/(size**2+1)]*(size**2+1)
     p=np.random.multinomial(1090, [1/(size**2+1)]*(size**2+1))
     #rint('p=',p)
-    p[-1]=1
+    p[-1]=0
     p=p/np.sum(p)
     #print('p',p)
     v=(np.random.rand()-0.5)*2
@@ -212,23 +220,24 @@ class MCTS():
         seq_reocord=[]
         root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=size , F=f,seq_reocord=seq_reocord)
         now_node=root
-        #root.clear_None()
-        #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+        root.clear_None()
+        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         while now_node!=None:
-            for i in range(100):
+            for i in range(3):
                 now_node.selection()
-                #root.clear_None()
-                #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+                root.clear_None()
+                print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
             now_node=now_node.play()
-        #root.clear_None()
-        #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
+        root.clear_None()
+        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         """
         print(root.child)
         root=root.child_none_out[0]
         print(root.child)
         """
-        for i in range(5):
-            print(root.seq_reocord[i])
+        #for i in range(5):
+            #print(root.seq_reocord[i])
+        print('結束畫面')
         root.playing_env.render('terminal')
 
 if __name__ == '__main__':
