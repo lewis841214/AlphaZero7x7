@@ -4,7 +4,7 @@ from pptree import *
 
 size=7
 class Tree:
-    def __init__(self,parent ,added_position ,playing_env,env , size , F,layer=0, Done=False, lambda_=1, gamma=1):
+    def __init__(self,parent ,added_position ,playing_env,env ,seq_reocord, size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
         self.size=size
         self.layer=layer
@@ -30,7 +30,7 @@ class Tree:
         self.z=None
         # This show the invalid index, then when selection wants to go to here, it skip the invalid step
         self.invalid=self.State[3].reshape(-1)
-        self.Seq_recorder=[]
+        self.seq_reocord=seq_reocord
         #self.visual=[self.v,self.W, self.N]
         self.visual=" ".join(str(x) for x in self.W)
         
@@ -138,7 +138,7 @@ class Tree:
         #first put 
         self.env.state_=self.State
         state, reward, done, info = self.env.step(added_position)
-        self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env , self.size,Done=done, F=self.F, layer=self.layer+1)
+        self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env ,self.seq_reocord, self.size,Done=done, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
         self.child[added_position].back_up()
         self.child[added_position].reward=reward
@@ -168,7 +168,7 @@ class Tree:
             next_action=np.argmax(self.pi)
         #print(self.pi)
         #有了pi之後 我們就可以把pi record下來。每個state 會有一個對應到的pi 跟z 
-        self.Seq_recorder.append([self.State, self.pi])
+        self.seq_reocord.append([self.State, self.pi])
 
         #接下來 就是用把self.playing_env.step(next_action)
         #並偵測是否已經結束。 已經結束的話 就可以開始製作sequence
@@ -180,8 +180,8 @@ class Tree:
         if done==1:
             #這邊開始將結果"reward"=[-1 or 1] 1 是黑棋贏的時候塞回去sequence中。
             #(S0, pi0) 為function第一個衡量的情況，也就是黑棋贏的機率
-            for i in range(len(self.Seq_recorder)):
-                self.Seq_recorder[i].append(reward)
+            for i in range(len(self.seq_reocord)):
+                self.seq_reocord[i].append(reward)
                 reward=-reward
             return None
         else:
@@ -198,7 +198,7 @@ def f(State_):
     #pp=[1/(size**2+1)]*(size**2+1)
     p=np.random.multinomial(1090, [1/(size**2+1)]*(size**2+1))
     #rint('p=',p)
-    p[-1]=0
+    p[-1]=1
     p=p/np.sum(p)
     #print('p',p)
     v=(np.random.rand()-0.5)*2
@@ -209,12 +209,13 @@ class MCTS():
         #為了在過程中 偵測誰的地盤比較大，所以在go_env(衡量每個node的狀態) 我們把reward設成Heuristic，以便偵測當一個人pass的時候，另一個人如果已經贏了(地盤比較大)那就要pass
         go_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='heuristic')
         playing_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='real')
-        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=size , F=f)
+        seq_reocord=[]
+        root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=size , F=f,seq_reocord=seq_reocord)
         now_node=root
         #root.clear_None()
         #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
         while now_node!=None:
-            for i in range(10):
+            for i in range(100):
                 now_node.selection()
                 #root.clear_None()
                 #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=False)
@@ -226,7 +227,9 @@ class MCTS():
         root=root.child_none_out[0]
         print(root.child)
         """
-    
+        for i in range(5):
+            print(root.seq_reocord[i])
+        root.playing_env.render('terminal')
 
 if __name__ == '__main__':
     #First create a neural network which will output prabability distribution and action|state value
