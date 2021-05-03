@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 from pptree import *
-
+import os
 size=3
 class Tree:
     def __init__(self,parent ,added_position ,playing_env,env ,seq_reocord, size , F,layer=0, Done=False, lambda_=1, gamma=1):
@@ -223,11 +223,13 @@ class MCTS():
         root.clear_None()
         print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         while now_node!=None:
-            for i in range(3):
+            for i in range(5):
                 now_node.selection()
                 root.clear_None()
                 print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
             now_node=now_node.play()
+            input('')
+
         root.clear_None()
         print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         """
