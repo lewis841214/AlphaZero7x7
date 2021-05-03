@@ -2,7 +2,8 @@ import gym
 import numpy as np
 from pptree import *
 import os
-size=3
+import time
+size=7
 class Tree:
     def __init__(self,parent ,added_position ,playing_env,env ,seq_reocord, size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
@@ -34,7 +35,7 @@ class Tree:
         #self.visual=[self.v,self.W, self.N]
         self.visual=" ".join(str(x) for x in self.W)
         
-    def back_up(self):
+    def back_up(self,now_node):
         #print('進入back up')
         #print('in back_up')
         #現在back up 因為變成action value，action value 會attach 在parent身上。所以往回
@@ -44,9 +45,9 @@ class Tree:
         cur=self.parent
         position=self.add
         value=self.v
-        print('\nposition',position,'value',value)
+        #print('\nposition',position,'value',value)
         value=-value
-        while cur!=None:
+        while cur!=now_node.parent:
             #print('in back_up loop')
             
             #print('cur.W[position]',cur.W[position])
@@ -55,17 +56,17 @@ class Tree:
             cur.N[position]+=1
             cur.act_Q[position]=cur.W[position]/cur.N[position]
             position=cur.add
-            print('position',position,)
+            #print('position',position,)
             #print('\n hi',cur.act_Q[position],cur.W[position],cur.N[position],'\n')
             """
             Here add some recorded
             """
-            cur.visual=" ".join(str(x) for x in cur.W)
+            cur.visual="N="+",".join(str(x) for x in cur.N)+"W="+",".join(str(x) for x in cur.W)+"p="+",".join(str(x) for x in cur.p)
             cur=cur.parent
             value=-value
         #print('end back up')
 
-    def selection(self):
+    def selection(self, now_node):
         #print(self.parent)
         #This function goes to some node and select a edge with no attached node.
         #But we should consider the stopping criteria
@@ -89,11 +90,11 @@ class Tree:
                 if (np.sum(self.State[2])-1)*self.reward<0:
                     
                     if self.child[self.size**2]==None:
-                        self.expand(self.size**2)
+                        self.expand(self.size**2,now_node)
                         return True
                     elif self.child[self.size**2]!=None:
                         #這邊就不要再進去selection了，因為下面一個node不會有child。但是我們也要增加這種情況的計數，所以在這邊直接back up即可
-                        self.child[self.size**2].back_up()
+                        self.child[self.size**2].back_up(now_node)
             #print('self.act_Q',self.act_Q)
             #print('self.p',self.p)
             self.S_select=self.act_Q+self.lambda_*(self.p/(1+self.N))
@@ -113,10 +114,10 @@ class Tree:
                 if soted_index[i]==self.size**2:
                     #print('sel 進入 pass')
                     if self.child[soted_index[i]]==None:
-                        self.expand(soted_index[i])
+                        self.expand(soted_index[i],now_node)
                         return True
                     elif self.child[soted_index[i]]!=None:
-                        Done=self.child[soted_index[i]].selection()
+                        Done=self.child[soted_index[i]].selection(now_node)
                         return True
 
                 
@@ -128,23 +129,23 @@ class Tree:
                     #Then Do expand
                     #print(self.invalid)
                     #print('soted_index[i]',soted_index[i])
-                    self.expand(soted_index[i])
+                    self.expand(soted_index[i],now_node)
                
                     return True
                 elif self.child[soted_index[i]]!=None:
                     #print(self.invalid)
                     #print('soted_index[i]',soted_index[i])
-                    self.child[soted_index[i]].selection()
+                    self.child[soted_index[i]].selection(now_node)
                     return True
                 
-    def expand(self, added_position):
+    def expand(self, added_position,now_node):
         #print('進入expand')
         #first put 
         self.env.state_=self.State
         state, reward, done, info = self.env.step(added_position)
         self.child[added_position]=Tree(self, added_position ,self.playing_env,self.env ,self.seq_reocord, self.size,Done=done, F=self.F, layer=self.layer+1)
         self.child[added_position].parent=self
-        self.child[added_position].back_up()
+        self.child[added_position].back_up(now_node)
         self.child[added_position].reward=reward
         # 如果done=1的時候，env就會掛掉 就不能再重新帶入state_了。所以我們要把env.done改成0
         if done==1:
@@ -181,7 +182,7 @@ class Tree:
         #print('play',next_action)
         state, reward, done, info=self.playing_env.step(next_action)
         #print('pi',self.pi)
-        self.playing_env.render('terminal')
+        #self.playing_env.render('terminal')
         #print('經過這邊')
         if done==1:
             #print('進來邊 前')
@@ -215,23 +216,24 @@ def f(State_):
 class MCTS():
     def __init__(self):
         #為了在過程中 偵測誰的地盤比較大，所以在go_env(衡量每個node的狀態) 我們把reward設成Heuristic，以便偵測當一個人pass的時候，另一個人如果已經贏了(地盤比較大)那就要pass
+        
         go_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='heuristic')
         playing_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='real')
         seq_reocord=[]
         root=Tree(parent=None ,added_position=None ,playing_env=playing_env,env=go_env , size=size , F=f,seq_reocord=seq_reocord)
         now_node=root
-        root.clear_None()
-        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
+        #root.clear_None()
+        #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         while now_node!=None:
             for i in range(5):
-                now_node.selection()
-                root.clear_None()
-                print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
+                now_node.selection(now_node)
+                #root.clear_None()
+                #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
             now_node=now_node.play()
-            input('')
+            #input('')
 
-        root.clear_None()
-        print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
+        #root.clear_None()
+        #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         """
         print(root.child)
         root=root.child_none_out[0]
@@ -244,6 +246,8 @@ class MCTS():
 
 if __name__ == '__main__':
     #First create a neural network which will output prabability distribution and action|state value
+    start=time.time()
     mcts=MCTS()
+    print('time',time.time()-start)
     
 
