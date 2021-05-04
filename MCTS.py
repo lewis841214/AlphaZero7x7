@@ -3,7 +3,8 @@ import numpy as np
 from pptree import *
 import os
 import time
-size=7
+from utils import *
+size=2
 class Tree:
     def __init__(self,parent ,added_position ,playing_env,env ,seq_reocord, size , F,layer=0, Done=False, lambda_=1, gamma=1):
         self.action_num=size**2+1 # board size size^2 + pass
@@ -171,7 +172,11 @@ class Tree:
             
         else:
             self.pi=self.N**self.gamma/np.sum(self.N**self.gamma)
-            next_action=np.argmax(self.pi)
+            
+            next_action=prob_select(self.pi)
+            print(self.pi)
+            print(next_action)
+            #next_action=np.argmax(self.pi)
         #print(self.pi)
         #有了pi之後 我們就可以把pi record下來。每個state 會有一個對應到的pi 跟z 
         self.seq_reocord.append([self.State, self.pi])
