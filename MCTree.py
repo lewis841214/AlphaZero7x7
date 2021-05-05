@@ -7,7 +7,7 @@ import time
 size = 4
 
 class Tree:
-    def __init__(self, parent, size, state, env, F, lambda_=1, gamma=1):
+    def __init__(self, parent, p, size, state, env, F, lambda_=1, gamma=1):
 
         self.parent = parent
         self.state = state
@@ -18,7 +18,7 @@ class Tree:
         self.f = F
         # NN simulator
         self.w = self.f.valuestate(self.state)
-        self.p = 1
+        self.p = p
         # init w with self.state 
         # w won't change
         self.n = 1
@@ -27,6 +27,7 @@ class Tree:
         # value = win rate 
         # include child winrate
         self.childlist = [None]* (self.size ** 2 + 1)
+        self.childp = self.f.childp(self.size ** 2 + 1)
         self.childlistP = []
         # size ^2 + pass
 
@@ -48,7 +49,7 @@ class Tree:
             #select return a state
             pass
         else:
-            print("Game is over")
+            #print("Game is over")
             pass
             # game is over
 
@@ -76,7 +77,7 @@ class Tree:
                 # if this childnode has been created
                 # use winnrate to value the node
                 # let p = 1
-                if bestvalue < (self.childlist[i].winrate() + self.lambda_ * self.p / ( 1 + self.childlist[i].n))
+                if bestvalue < (self.childlist[i].winrate() + self.lambda_ * self.p / ( 1 + self.childlist[i].n)):
                     best = i
                     bestvalue = (self.childlist[i].winrate() + self.lambda_ * self.p / ( 1 + self.childlist[i].n))
 
@@ -88,8 +89,8 @@ class Tree:
                     bestvalue = self.f.valuestate(childstates[i] + self.lambda_)
             else:
                 # not a valid move
-                print("Select: no valid moves")
-                continue
+                #print("not a valid move")
+                pass
         
         if bestvalue == -1:
             #there is no valid move
@@ -101,7 +102,7 @@ class Tree:
         # backup update w & n until root
         if self.childlist[best] == None:
             # creat a new node
-            self.childlist[best] = Tree(self, self.size, childstates[best], self.env, self.f, lambda_ =self.lambda_, gamma = self.gamma)
+            self.childlist[best] = Tree(self, self.childp[best], self.size, childstates[best], self.env, self.f, self.lambda_, self.gamma)
             self.childlistP.append(self.childlist[best])
             updatevalue = self.childlist[best].w
         else:
@@ -112,18 +113,8 @@ class Tree:
         self.q += updatevalue
         self.n += 1
         # update myself
-        return updatevalue
+        return -updatevalue
         # return update value to parent
-
-
-                
-        
-
-        
-
-
-
-        
 
     
     def findchild(self, state):
@@ -135,7 +126,28 @@ class Tree:
         return -1
 
     def play(self):
-        pass
+        sum = 0
+        if len(self.childlist) == 1:
+            return self.childlist[0].state
+
+        for i in range(len(self.childlist)-1):
+            if self.childlist[i] != None:
+                sum += self.childlist[i].n ** (1 / self.gamma)
+        # sum up each child's N
+        print("Play:")
+        print(sum)
+        sum = random.uniform(0,sum)
+        print(sum)
+
+        for i in range(len(self.childlist)):
+            if self.childlist[i] != None:
+                sum = sum - self.childlist[i].n ** (1 / self.gamma)
+            if sum < 0:
+                return self.childlist[i].state
+
+        print("Tree.Play: random choose child error")
+
+
 
 
     def winrate(self):
@@ -148,15 +160,36 @@ class F:
     def valuestate(self, state):
         return hash(state.tobytes) % 10000
 
+    def childp(self,size):
+        #generate p for each child
+        t = []
+        for i in range(size):
+            t.append(random.uniform(0,1))
+        
+        return t
+
 
 class MCTS():
     def __init__(self):
-        go_env = gym.make('gym_go:go-v0', size=3, komi=0, reward_method='real')
+        self.size = 4
+        self.simu_round = 10
+        go_env = gym.make('gym_go:go-v0', size=self.size, komi=0, reward_method='real')
         f = F()
-        root = Tree(None, 3, go_env.state_, go_env, f)
-        for i in range(5):
-            root.select()
-        print_tree(root, 'childlistP','self.w', False)
+        r = 1
+        while r:
+            root = Tree(None, 1, self.size, go_env.state_, go_env, f)
+            for i in range(self.simu_round):
+                root.select()
+
+            for i in range(len(root.childlist)):
+                if root.childlist[i] != None:
+                    print(root.childlist[i].n, end = ' ')
+            go_env.state_ = root.play()
+            go_env.render('terminal')
+
+
+            r = input()
+
 
     
 
