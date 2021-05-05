@@ -215,7 +215,7 @@ def f(State_):
     return p,v
 
 class MCTS():
-    def __init__(self,f,num_of_select=20):
+    def __init__(self,f,num_of_select=200):
         #為了在過程中 偵測誰的地盤比較大，所以在go_env(衡量每個node的狀態) 我們把reward設成Heuristic，以便偵測當一個人pass的時候，另一個人如果已經贏了(地盤比較大)那就要pass
         
         go_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='heuristic')

@@ -11,7 +11,15 @@ from utils import *
 import torch.nn as nn
 import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+def f_random(State_):
+    #pp=[1/(size**2+1)]*(size**2+1)
+    p=np.random.multinomial(1090, [1/(size**2+1)]*(size**2+1))
+    #rint('p=',p)
+    p[-1]=0
+    p=p/np.sum(p)
+    #print('p',p)
+    v=(np.random.rand()-0.5)*2
+    return p,v
 class f_():
     def __init__(self,model):
         self.model=model
@@ -36,18 +44,28 @@ def f_(state):
     return out_p, out_v
 """
 if __name__ == '__main__':
-    Res_num=10
-    hidden=100
-    width=7
-    num_of_select=400
-    PATH='test_output'
-    model = Net(Res_num,hidden, width)
-    model.load_state_dict(torch.load(PATH))
-    model.eval()
-    model.to(device)
+    start=time.time()        
+    Generation='random' # 'random', 'by_network'
+    if Generation=='by_network':
+        Res_num=10
+        hidden=100
+        width=7
+        num_of_select=400
+        PATH='test_output'
+        model = Net(Res_num,hidden, width)
+        model.load_state_dict(torch.load(PATH))
+        model.eval()
+        model.to(device)
+        f=f_(model)
+        for i in range(1000):
+            mcts=MCTS(f.forward)
+            print('time',time.time()-start)
+    elif Generation=='random':
+        for i in range(1000):
+            mcts=MCTS(f_random)
+            print('time',time.time()-start)
     
-
-    f=f_(model)
-    mcts=MCTS(f.forward)
+    
+    print('time',time.time()-start)
 
     

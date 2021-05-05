@@ -105,18 +105,18 @@ if __name__ == '__main__':
     f_(state,model)
 
 
+
+
+
+
+
+
+
+
+
+
+
 """
-
-
-
-
-
-
-
-
-
-
-
 
     true_p=torch.tensor([[0 for i in range(width**2+1)]], dtype=torch.float,requires_grad=False)
     #true_p=true_p/torch.sum(true_p)
