@@ -20,13 +20,10 @@ check2=torch.matmul(B,check1)
 check3=torch.matmul(torch.kron(x,y),check2)
 check4=torch.matmul(A,check3)
 loss=torch.trace(check4)
-#loss=torch.trace((@)) 
-
-#for i in range(10):
-
 loss.backward()
-print(loss)
-#print(loss.grad_fn)
+print('x grad',x.grad)
+
+print(loss.grad_fn)
 #print(loss.grad_fn.next_functions)
 #print(loss.grad_fn.next_functions[0][0])
 #print(loss.grad_fn.next_functions[0][0].next_functions)
@@ -40,11 +37,11 @@ print(loss)
 #x=x-0.0001*x.grad
     
 def p_grad_fn(node,layer=0):
-    print('_','_'*layer,node)
+    print('_'+'_'*layer,node)
     if node !=None:
             
         for XX in node.next_functions:
-            p_grad_fn(XX[0],layer)
+            p_grad_fn(XX[0],layer+1)
 p_grad_fn(loss.grad_fn)
 
 

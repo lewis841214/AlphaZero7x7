@@ -8,6 +8,8 @@ from utils import *
 
 import torch.nn as nn
 import torch.nn.functional as F
+device = torch.device('cuda:0')
+
 class Residual_struct(nn.Module):
     def __init__(self, hidden):
         super().__init__()
@@ -43,7 +45,7 @@ class Net(nn.Module):
             nn.ReLU(),
         )
         self.Res_num=Res_num
-        self.Rew_list=[Residual_struct(hidden) for i in range(Res_num) ]
+        self.Rew_list=[Residual_struct(hidden).to(device) for i in range(Res_num) ]
         self.Policy=nn.Sequential(
             nn.Conv2d(hidden,2,1), #input ch=3 [balck, white, whos tern]
             nn.BatchNorm2d(2),
@@ -74,19 +76,48 @@ class Net(nn.Module):
         p=self.Policy(x)
         v=self.Value(x)
         return p,v
-
+def f_(state,model):
+    model=model.to(device)
+    state=torch.tensor(state[:3], dtype=torch.float).to(device)
+    state=state.to(device)
+    #state=torch.unsqueeze(state, 0)
+    #print(state.shape)
+    #print(model)
+    #print(state)
+    out_p,out_v=model(state.to(device))
+    out_p=out_p.clone().detach().cpu()[0].numpy()
+    out_v=out_v.clone().detach().cpu()[0].numpy()
+    ##print(out_p)
+    #print(out_v)
 if __name__ == '__main__':
     go_env = gym.make('gym_go:go-v0', size=7, komi=0, reward_method='heuristic')
     state,reward,_,_=go_env.step(0)
-    state=torch.tensor(state[:3], dtype=torch.float)
+    state=torch.tensor(state[:3], dtype=torch.float).to(device)
     state=torch.unsqueeze(state, 0)
 
     Res_num=10
     hidden=100
     width=7
-    model = Net(Res_num,hidden, width)
+    model = Net(Res_num,hidden, width).to(device)
+    model=model.to(device)
     #print(net(state))
     
+    f_(state,model)
+
+
+"""
+
+
+
+
+
+
+
+
+
+
+
+
     true_p=torch.tensor([[0 for i in range(width**2+1)]], dtype=torch.float,requires_grad=False)
     #true_p=true_p/torch.sum(true_p)
     true_p[0][0]=1
@@ -105,7 +136,7 @@ if __name__ == '__main__':
     print('loss',loss)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.004, weight_decay=1e-4)
 
-    for i in range(1000):
+    for i in range(10):
         output,output_v=model(state)
         loss=cross_entropy(output,true_p)+torch.sum((output_v-true_v)**2)
         optimizer.zero_grad()
@@ -116,3 +147,8 @@ if __name__ == '__main__':
         print('true_v',true_v)
         print('output_v',output_v)
         print('right term',torch.sum((output_v-true_v)**2))
+    PATH='test_output'
+    torch.save(model.state_dict(), PATH)
+    model.load_state_dict(torch.load(PATH))
+    model.eval()
+    """

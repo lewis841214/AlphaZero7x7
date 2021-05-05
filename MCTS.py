@@ -37,11 +37,7 @@ class Tree:
         self.visual=" ".join(str(x) for x in self.W)
         
     def back_up(self,now_node):
-        #print('進入back up')
-        #print('in back_up')
-        #現在back up 因為變成action value，action value 會attach 在parent身上。所以往回
-        #送的時候，可能還要給出 node number之類的
-
+       
         
         cur=self.parent
         position=self.add
@@ -206,7 +202,7 @@ class Tree:
         self.child_none_out=self.child[self.child != np.array(None)]
         for i in range(self.child_none_out.shape[0]):
             self.child_none_out[i].clear_None()
-            
+
 #Here create a function output just like Neural network
 def f(State_):
     #pp=[1/(size**2+1)]*(size**2+1)
@@ -219,7 +215,7 @@ def f(State_):
     return p,v
 
 class MCTS():
-    def __init__(self):
+    def __init__(self,f,num_of_select=20):
         #為了在過程中 偵測誰的地盤比較大，所以在go_env(衡量每個node的狀態) 我們把reward設成Heuristic，以便偵測當一個人pass的時候，另一個人如果已經贏了(地盤比較大)那就要pass
         
         go_env = gym.make('gym_go:go-v0', size=size, komi=0, reward_method='heuristic')
@@ -230,7 +226,7 @@ class MCTS():
         #root.clear_None()
         #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
         while now_node!=None:
-            for i in range(5):
+            for i in range(num_of_select):
                 now_node.selection(now_node)
                 #root.clear_None()
                 #print_tree(root, childattr='child_none_out', nameattr='visual', horizontal=True)
@@ -252,7 +248,7 @@ class MCTS():
 if __name__ == '__main__':
     #First create a neural network which will output prabability distribution and action|state value
     start=time.time()
-    mcts=MCTS()
+    mcts=MCTS(f)
     print('time',time.time()-start)
     
 
